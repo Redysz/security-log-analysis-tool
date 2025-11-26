@@ -21,6 +21,7 @@ class LogAnalyzer:
         incidents: list[Incident] = []
         incidents += self._detect_bruteforce(entries)
         incidents += self._detect_sql_injection(entries)
+        incidents += self._detect_unusual_access(entries)
         for incident in incidents:
             print(incident)
 
@@ -80,12 +81,31 @@ class LogAnalyzer:
 
     @staticmethod
     def _detect_sql_injection(entries: list[LogEntry]) -> list[Incident]:
+        """SQL Injection Attempt: Detection of common SQL injection patterns in user input fields."""
         incidents: list[Incident] = []
         for entry in entries:
             if entry.event_type == EventType.SQL_INJECTION_ATTEMPT.value:
                 incident = Incident(
                     rule_name="SQL injection attempt",
                     description="SQL injection pattern detected in user input.",
+                    first_seen=entry.timestamp,
+                    last_seen=entry.timestamp,
+                    source_ip=entry.source_ip,
+                    extra={"details": entry.details}
+                )
+                incidents.append(incident)
+        return incidents
+
+    @staticmethod
+    def _detect_unusual_access(entries: list[LogEntry]) -> list[Incident]:
+        """Unusual Access: Access to sensitive files/directories
+        by an unauthorized user or from an unusual IP."""
+        incidents: list[Incident] = []
+        for entry in entries:
+            if entry.event_type == EventType.UNUSUAL_ACCESS.value:
+                incident = Incident(
+                    rule_name="Unusual access",
+                    description="Access to sensitive file or path.",
                     first_seen=entry.timestamp,
                     last_seen=entry.timestamp,
                     source_ip=entry.source_ip,
