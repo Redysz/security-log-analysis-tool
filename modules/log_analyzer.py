@@ -11,6 +11,7 @@ class LogAnalyzer:
     # thresholds
     FAILED_LOGIN_THRESHOLD_IN_SHORT_TIME = 3
     FAILED_LOGIN_TIME_WINDOW_IN_SECONDS = timedelta(seconds=600)
+    PORT_SCAN_THRESHOLD = 2
 
     def __init__(self, path: Path):
         self.path = path
@@ -22,6 +23,7 @@ class LogAnalyzer:
         incidents += self._detect_bruteforce(entries)
         incidents += self._detect_sql_injection(entries)
         incidents += self._detect_unusual_access(entries)
+        incidents += self._detect_portscan(entries)
         for incident in incidents:
             print(incident)
 
@@ -112,6 +114,34 @@ class LogAnalyzer:
                     extra={"details": entry.details}
                 )
                 incidents.append(incident)
+        return incidents
+
+    def _detect_portscan(self, entries: list[LogEntry]) -> list[Incident]:
+        """Port Scan Detection: Repeated connection attempts to different ports from a single source."""
+        potential_port_scan: dict[str, list[LogEntry]] = defaultdict(list)
+        for entry in entries:
+            if entry.event_type == EventType.PORT_SCAN_ATTEMPT.value:
+                target_port = self._extract_key_value(entry.details).get("target")
+                if not target_port:
+                    continue
+                potential_port_scan[entry.source_ip].append(entry)
+
+        incidents: list[Incident] = []
+        for ip, logs in potential_port_scan.items():
+            ports = frozenset(self._extract_key_value(log.details).get("target", "unknown") for log in logs)
+            ports = sorted(ports)
+            if len(ports) <= self.PORT_SCAN_THRESHOLD:
+                continue
+            incident = Incident(
+                rule_name="Port scan",
+                description=f"Port scan from {ip} for ports: {', '.join(ports)}.",
+                first_seen=logs[0].timestamp,
+                last_seen=logs[-1].timestamp,
+                source_ip=ip,
+                extra={"ports count": f"{len(ports)}"}
+            )
+            incidents.append(incident)
+
         return incidents
 
     @staticmethod
