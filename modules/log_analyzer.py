@@ -3,14 +3,14 @@ from pathlib import Path
 import re
 from datetime import datetime, timedelta
 
-from modules.constants import LOG_LINE_RE
+from modules.constants import LOG_LINE_RE, EventType
 from modules.models import Incident, LogEntry
 
 
 class LogAnalyzer:
     # thresholds
     FAILED_LOGIN_THRESHOLD_IN_SHORT_TIME = 3
-    FAILED_LOGIN_TIME_WINDOW_IN_SECONDS = timedelta(seconds=60)
+    FAILED_LOGIN_TIME_WINDOW_IN_SECONDS = timedelta(seconds=600)
 
     def __init__(self, path: Path):
         self.path = path
@@ -20,7 +20,9 @@ class LogAnalyzer:
         entries: list[LogEntry] = self._read_and_parse()
         incidents: list[Incident] = []
         incidents += self._detect_bruteforce(entries)
-        print(incidents)
+        incidents += self._detect_sql_injection(entries)
+        for incident in incidents:
+            print(incident)
 
     def _read_and_parse(self) -> list[LogEntry]:
         entries = []
@@ -48,7 +50,7 @@ class LogAnalyzer:
         IP address within a short timeframe."""
         potential_bruteforce: dict[str, list[LogEntry]] = defaultdict(list)
         for entry in entries:
-            if entry.event_type == "FAILED_LOGIN":
+            if entry.event_type == EventType.FAILED_LOGIN.value:
                 potential_bruteforce[entry.source_ip].append(entry)
 
         incidents: list[Incident] = []
@@ -64,7 +66,7 @@ class LogAnalyzer:
             usernames = frozenset(self._extract_key_value(log.details).get("user", "unknown") for log in logs)
             incident = Incident(
                 rule_name="Brute-force attempt",
-                description=f"{len(logs)} failed login attempts from {ip} (possible brute-force)",
+                description=f"{len(logs)} failed login attempts from {ip} (possible brute-force).",
                 first_seen=logs[0].timestamp,
                 last_seen=logs[-1].timestamp,
                 source_ip=ip,
@@ -74,6 +76,22 @@ class LogAnalyzer:
                 }
             )
             incidents.append(incident)
+        return incidents
+
+    @staticmethod
+    def _detect_sql_injection(entries: list[LogEntry]) -> list[Incident]:
+        incidents: list[Incident] = []
+        for entry in entries:
+            if entry.event_type == EventType.SQL_INJECTION_ATTEMPT.value:
+                incident = Incident(
+                    rule_name="SQL injection attempt",
+                    description="SQL injection pattern detected in user input.",
+                    first_seen=entry.timestamp,
+                    last_seen=entry.timestamp,
+                    source_ip=entry.source_ip,
+                    extra={"details": entry.details}
+                )
+                incidents.append(incident)
         return incidents
 
     @staticmethod
