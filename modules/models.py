@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class LogEntry:
     timestamp: str
     severity: str
-    src_ip: str
+    source_ip: str
     event_type: str
     details: str
 
@@ -16,5 +16,5 @@ class Incident:
     description: str
     first_seen: str
     last_seen: str
-    src_ip: str
+    source_ip: str
     extra: dict[str, str]
