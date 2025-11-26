@@ -24,8 +24,7 @@ class LogAnalyzer:
         incidents += self._detect_sql_injection(entries)
         incidents += self._detect_unusual_access(entries)
         incidents += self._detect_portscan(entries)
-        for incident in incidents:
-            print(incident)
+        self._show_report(incidents)
 
     def _read_and_parse(self) -> list[LogEntry]:
         entries = []
@@ -154,3 +153,28 @@ class LogAnalyzer:
                 key, value = element.split("=", 1)
                 result[key.strip()] = value.strip()
         return result
+
+    def _show_report(self, incidents: list[Incident]) -> None:
+        if not incidents:
+            print("No suspicious activity detected. Unbelievable, probably your IT-MAN is Karol Kurek in the flash :-)")
+            return
+        print("=" * 80)
+        print("SECURITY INCIDENT REPORT")
+        print("=" * 80)
+        print()
+
+        for i, incident in enumerate(incidents, start=1):
+            l_just = 15
+            print(f"[{i}] Rule:".ljust(l_just) + f"{incident.rule_name}")
+            print(f"Description:".ljust(l_just) + f"{incident.description}")
+            print(f"Source IP:".ljust(l_just) + f"{incident.source_ip}")
+            print(f"First seen:".ljust(l_just) + f"{incident.first_seen}")
+            print(f"Last seen:".ljust(l_just) + f"{incident.last_seen}")
+            if incident.extra:
+                for key, value in incident.extra.items():
+                    print(f"{key}:".ljust(l_just) + f"{value}")
+            print()
+        print("=" * 80)
+        print()
+        print(f"End of the report. There were {len(incidents)} incidents!")
+        print(f"If any of those were successfully used for data breach it means your IT-MAN is not Karol Kurek :-(.")
